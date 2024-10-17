@@ -2,7 +2,7 @@
 // @name         Alist-Video-Progress-Recorder
 // @namespace    http://tampermonkey.net/
 // @version      1.0
-// @description  记录并恢复视频的播放进度
+// @description  记录并显示最近的五次ArtPlayer视频播放进度
 // @author       hope140
 // @match        https://alist.510711.xyz/*
 // @match        http://192.168.0.100:5244/*
@@ -12,44 +12,150 @@
 (function() {
     'use strict';
 
+    // 全局变量
+    let playbackHistory = [];
+
     // 定义保存视频进度的函数
-    function saveVideoProgress(videoElement) {
-        const videoUrl = videoElement.currentSrc;
-        const currentTime = videoElement.currentTime;
-        localStorage.setItem('videoProgress_' + videoUrl, currentTime);
-        console.log(`进度已保存: ${currentTime}`);
+    function saveVideoProgress(videoUrl, currentTime) {
+        // 获取之前的播放记录
+        let videoHistory = JSON.parse(localStorage.getItem('videoPlaybackHistory')) || [];
+
+        // 检查当前视频是否已存在于记录中
+        const existingRecordIndex = videoHistory.findIndex(record => record.url === videoUrl);
+
+        if (existingRecordIndex !== -1) {
+            // 如果存在，更新当前进度
+            videoHistory[existingRecordIndex].time = currentTime;
+            videoHistory[existingRecordIndex].date = new Date().toLocaleString();
+        } else {
+            // 如果不存在，新增记录
+            videoHistory.push({
+                url: videoUrl,
+                time: currentTime,
+                date: new Date().toLocaleString()
+            });
+        }
+
+        // 限制为最近的五条记录
+        if (videoHistory.length > 5) {
+            videoHistory.shift(); // 删除最早的一条记录
+        }
+
+        // 保存到 localStorage
+        localStorage.setItem('videoPlaybackHistory', JSON.stringify(videoHistory));
     }
 
-    // 定义加载视频进度的函数
-    function loadVideoProgress(videoElement) {
-        const videoUrl = videoElement.currentSrc;
-        const savedTime = localStorage.getItem('videoProgress_' + videoUrl);
-        if (savedTime) {
-            videoElement.currentTime = parseFloat(savedTime);
-            console.log(`进度已恢复: ${savedTime}`);
+    // 定义加载播放历史的函数
+    function loadPlaybackHistory() {
+        playbackHistory = JSON.parse(localStorage.getItem('videoPlaybackHistory')) || [];
+        return playbackHistory;
+    }
+
+    // 创建一个按钮来显示播放记录
+    function createHistoryButton() {
+        const historyButton = document.createElement('button');
+        historyButton.textContent = '播放记录';
+        historyButton.style.position = 'fixed';
+        historyButton.style.top = '20px';
+        historyButton.style.right = '20px';
+        historyButton.style.zIndex = '9999';
+        historyButton.style.padding = '10px';
+        historyButton.style.backgroundColor = '#007BFF';
+        historyButton.style.color = '#fff';
+        historyButton.style.border = 'none';
+        historyButton.style.borderRadius = '5px';
+        historyButton.style.cursor = 'pointer';
+
+        document.body.appendChild(historyButton);
+
+        // 点击按钮显示记录
+        historyButton.addEventListener('click', displayPlaybackHistory);
+    }
+
+    // 创建一个弹窗来展示播放记录
+    function displayPlaybackHistory() {
+        loadPlaybackHistory();
+
+        // 如果之前已有弹窗，先移除
+        let existingModal = document.querySelector('#historyModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // 创建弹窗容器
+        const modal = document.createElement('div');
+        modal.id = 'historyModal';
+        modal.style.position = 'fixed';
+        modal.style.top = '50%';
+        modal.style.left = '50%';
+        modal.style.transform = 'translate(-50%, -50%)';
+        modal.style.zIndex = '10000';
+        modal.style.padding = '20px';
+        modal.style.backgroundColor = '#fff';
+        modal.style.border = '1px solid #ccc';
+        modal.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
+        modal.style.width = '300px';
+
+        // 添加关闭按钮
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '关闭';
+        closeButton.style.marginBottom = '10px';
+        closeButton.style.backgroundColor = '#007BFF';
+        closeButton.style.color = '#fff';
+        closeButton.style.border = 'none';
+        closeButton.style.padding = '5px 10px';
+        closeButton.style.cursor = 'pointer';
+
+        closeButton.addEventListener('click', () => {
+            modal.remove();
+        });
+
+        modal.appendChild(closeButton);
+
+        // 展示播放记录
+        if (playbackHistory.length === 0) {
+            const noHistory = document.createElement('p');
+            noHistory.textContent = '没有播放记录';
+            modal.appendChild(noHistory);
+        } else {
+            playbackHistory.forEach(record => {
+                const recordItem = document.createElement('p');
+                recordItem.innerHTML = `视频URL: <a href="${record.url}" target="_blank">${record.url}</a><br>播放时间: ${record.time.toFixed(2)} 秒<br>记录时间: ${record.date}`;
+                modal.appendChild(recordItem);
+            });
+        }
+
+        document.body.appendChild(modal);
+    }
+
+    // 查找ArtPlayer播放器并绑定事件
+    function monitorArtPlayer() {
+        const video = document.querySelector('video');
+
+        if (video) {
+            video.addEventListener('timeupdate', () => {
+                const currentTime = video.currentTime;
+                const videoUrl = video.currentSrc;
+
+                // 每隔5秒保存一次播放进度
+                if (Math.floor(currentTime) % 5 === 0) {
+                    saveVideoProgress(videoUrl, currentTime);
+                }
+            });
+
+            // 页面卸载时保存进度
+            window.addEventListener('beforeunload', () => {
+                saveVideoProgress(video.currentSrc, video.currentTime);
+            });
         }
     }
 
-    // 查找页面上的所有<video>标签
-    const videos = document.querySelectorAll('video');
+    // 初始化函数
+    function init() {
+        createHistoryButton();
+        monitorArtPlayer();
+    }
 
-    // 为每个视频添加事件监听
-    videos.forEach(video => {
-        // 页面加载时恢复播放进度
-        video.addEventListener('loadedmetadata', () => {
-            loadVideoProgress(video);
-        });
-
-        // 每隔5秒保存一次进度
-        video.addEventListener('timeupdate', () => {
-            if (Math.floor(video.currentTime) % 5 === 0) {
-                saveVideoProgress(video);
-            }
-        });
-
-        // 页面卸载时保存进度
-        window.addEventListener('beforeunload', () => {
-            saveVideoProgress(video);
-        });
-    });
+    // 等待页面加载完成后执行
+    window.addEventListener('load', init);
 })();
