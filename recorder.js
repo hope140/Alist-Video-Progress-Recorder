@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Alist-Video-Progress-Recorder
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  记录并显示最近的五次ArtPlayer视频播放进度
+// @version      1.1
+// @description  记录并显示最近的五次ArtPlayer视频播放进度（基于art-video类检测）
 // @author       hope140
 // @match        https://alist.510711.xyz/*
 // @match        http://192.168.0.100:5244/*
@@ -19,6 +19,7 @@
     function saveVideoProgress(videoUrl, currentTime) {
         // 获取之前的播放记录
         let videoHistory = JSON.parse(localStorage.getItem('videoPlaybackHistory')) || [];
+        console.log(`保存视频进度: URL = ${videoUrl}, currentTime = ${currentTime}`);
 
         // 检查当前视频是否已存在于记录中
         const existingRecordIndex = videoHistory.findIndex(record => record.url === videoUrl);
@@ -43,11 +44,13 @@
 
         // 保存到 localStorage
         localStorage.setItem('videoPlaybackHistory', JSON.stringify(videoHistory));
+        console.log(`播放进度已保存，当前记录:`, videoHistory);
     }
 
     // 定义加载播放历史的函数
     function loadPlaybackHistory() {
         playbackHistory = JSON.parse(localStorage.getItem('videoPlaybackHistory')) || [];
+        console.log('加载播放历史:', playbackHistory);
         return playbackHistory;
     }
 
@@ -70,6 +73,7 @@
 
         // 点击按钮显示记录
         historyButton.addEventListener('click', displayPlaybackHistory);
+        console.log('播放记录按钮已创建');
     }
 
     // 创建一个弹窗来展示播放记录
@@ -126,34 +130,47 @@
         }
 
         document.body.appendChild(modal);
+        console.log('播放记录弹窗已显示');
     }
 
-    // 查找ArtPlayer播放器并绑定事件
-    function monitorArtPlayer() {
-        const video = document.querySelector('video');
+    // 查找art-video播放器并绑定事件
+    function monitorVideoByClass() {
+        const intervalId = setInterval(() => {
+            const videoElement = document.querySelector('.art-video');
 
-        if (video) {
-            video.addEventListener('timeupdate', () => {
-                const currentTime = video.currentTime;
-                const videoUrl = video.currentSrc;
+            if (videoElement) {
+                clearInterval(intervalId);
+                console.log('art-video 视频元素已检测到');
 
-                // 每隔5秒保存一次播放进度
-                if (Math.floor(currentTime) % 5 === 0) {
-                    saveVideoProgress(videoUrl, currentTime);
-                }
-            });
+                // 监听播放进度
+                videoElement.addEventListener('timeupdate', () => {
+                    const currentTime = videoElement.currentTime;
+                    const videoUrl = window.location.href;  // 使用页面URL作为视频URL
 
-            // 页面卸载时保存进度
-            window.addEventListener('beforeunload', () => {
-                saveVideoProgress(video.currentSrc, video.currentTime);
-            });
-        }
+                    console.log(`视频播放进度: URL = ${videoUrl}, 当前时间 = ${currentTime}`);
+
+                    // 每隔5秒保存一次播放进度
+                    if (Math.floor(currentTime) % 5 === 0) {
+                        saveVideoProgress(videoUrl, currentTime);
+                    }
+                });
+
+                // 页面卸载时保存进度
+                window.addEventListener('beforeunload', () => {
+                    console.log('页面即将关闭，保存播放进度');
+                    saveVideoProgress(window.location.href, videoElement.currentTime);
+                });
+            } else {
+                console.log('尚未检测到 .art-video 视频元素');
+            }
+        }, 1000); // 每秒检查一次
     }
 
     // 初始化函数
     function init() {
+        console.log('初始化脚本...');
         createHistoryButton();
-        monitorArtPlayer();
+        monitorVideoByClass();
     }
 
     // 等待页面加载完成后执行
