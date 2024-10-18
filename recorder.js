@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Alist-Video-Progress-Recorder
 // @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  播放记录窗口圆角设计，简化视频名称和日期显示，按钮样式优化
+// @version      1.3
+// @description  记录点击跳转、时间显示优化、状态显示“已看完”
 // @author       hope140
 // @match        https://alist.510711.xyz/*
 // @match        http://192.168.0.100:5244/*
@@ -22,19 +22,22 @@
         return `${h}:${m}:${s}`;
     }
 
-    // 日期格式化函数
+    // 记录时间格式化函数
     function formatDate(dateString) {
         const date = new Date(dateString);
         const today = new Date();
         const yesterday = new Date(today);
         yesterday.setDate(today.getDate() - 1);
 
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+
         if (date.toDateString() === today.toDateString()) {
-            return '今天';
+            return `今天 ${hours}:${minutes}`;
         } else if (date.toDateString() === yesterday.toDateString()) {
-            return '昨天';
+            return `昨天 ${hours}:${minutes}`;
         } else {
-            return `${date.getMonth() + 1}月${date.getDate()}日`;
+            return `${date.getMonth() + 1}-${date.getDate()} ${hours}:${minutes}`;
         }
     }
 
@@ -47,18 +50,24 @@
     }
 
     // 定义保存视频进度的函数
-    function saveVideoProgress(videoUrl, currentTime) {
+    function saveVideoProgress(videoUrl, currentTime, duration) {
         let videoHistory = JSON.parse(localStorage.getItem('videoPlaybackHistory')) || [];
         const existingRecordIndex = videoHistory.findIndex(record => record.url === videoUrl);
+
+        let isWatched = currentTime >= duration - 30; // 如果当前时间接近视频时长，认为已看完
 
         if (existingRecordIndex !== -1) {
             videoHistory[existingRecordIndex].time = currentTime;
             videoHistory[existingRecordIndex].date = new Date().toLocaleString();
+            videoHistory[existingRecordIndex].isWatched = isWatched;
+            videoHistory[existingRecordIndex].duration = duration;
         } else {
             videoHistory.push({
                 url: videoUrl,
                 time: currentTime,
-                date: new Date().toLocaleString()
+                date: new Date().toLocaleString(),
+                isWatched: isWatched,
+                duration: duration
             });
         }
 
@@ -134,13 +143,31 @@
                 const recordItem = document.createElement('div');
                 recordItem.style.padding = '5px 0';
                 recordItem.style.borderBottom = '1px solid #eee';
+                recordItem.style.cursor = 'pointer';
+                recordItem.style.transition = 'box-shadow 0.3s';
+                recordItem.style.boxShadow = 'none';
+
+                // 鼠标移入移出效果
+                recordItem.addEventListener('mouseover', () => {
+                    recordItem.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+                });
+                recordItem.addEventListener('mouseout', () => {
+                    recordItem.style.boxShadow = 'none';
+                });
 
                 const fileName = extractFileName(record.url);
+                const formattedTime = record.isWatched ? '已看完' : `${formatTime(record.time)}/${formatTime(record.duration)}`;
+                const formattedDate = formatDate(record.date);
+
                 recordItem.innerHTML = `
                     <strong>#${index + 1}</strong> ${fileName}<br>
-                    <small>播放时间: ${formatTime(record.time)}</small><br>
-                    <small>记录时间: ${formatDate(record.date)}</small>
+                    <small>${formattedTime} | ${formattedDate}</small>
                 `;
+
+                // 点击记录跳转到对应视频
+                recordItem.addEventListener('click', () => {
+                    window.location.href = record.url;
+                });
 
                 modal.appendChild(recordItem);
             });
@@ -160,15 +187,16 @@
 
                 videoElement.addEventListener('timeupdate', () => {
                     const currentTime = videoElement.currentTime;
+                    const duration = videoElement.duration;
                     const videoUrl = window.location.href;
 
                     if (Math.floor(currentTime) % 5 === 0) {
-                        saveVideoProgress(videoUrl, currentTime);
+                        saveVideoProgress(videoUrl, currentTime, duration);
                     }
                 });
 
                 window.addEventListener('beforeunload', () => {
-                    saveVideoProgress(window.location.href, videoElement.currentTime);
+                    saveVideoProgress(window.location.href, videoElement.currentTime, videoElement.duration);
                 });
             }
         }, 1000);
