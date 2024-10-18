@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Alist-Video-Progress-Recorder
 // @namespace    http://tampermonkey.net/
-// @version      1.7
-// @description  鼠标悬停0.5秒显示完整视频名称，使用矢量图标作为播放记录按钮，禁用特定路径
+// @version      1.8
+// @description  图标反相效果，点击空白处关闭播放记录
 // @author       hope140
 // @match        https://alist.510711.xyz/*
 // @match        http://192.168.0.100:5244/*
@@ -97,7 +97,7 @@
     function createHistoryButton() {
         const historyButton = document.createElement('button');
         historyButton.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="rgb(24, 144, 255)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="rgb(24, 144, 255)" id="history-icon">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h10m-6 4h6" />
             </svg>
         `;
@@ -109,6 +109,18 @@
         historyButton.style.background = 'none';  // 去掉背景
         historyButton.style.border = 'none';  // 去掉边框
         historyButton.style.cursor = 'pointer';
+
+        // 添加鼠标悬停反相效果
+        historyButton.onmouseover = function() {
+            const icon = document.getElementById('history-icon');
+            icon.style.backgroundColor = 'rgb(24, 144, 255)';
+            icon.style.stroke = 'white';
+        };
+        historyButton.onmouseout = function() {
+            const icon = document.getElementById('history-icon');
+            icon.style.backgroundColor = 'white';
+            icon.style.stroke = 'rgb(24, 144, 255)';
+        };
 
         document.body.appendChild(historyButton);
         historyButton.addEventListener('click', togglePlaybackHistory);
@@ -214,6 +226,13 @@
         }
 
         document.body.appendChild(modal);
+
+        // 点击空白处关闭播放记录界面
+        document.addEventListener('click', function(event) {
+            if (!modal.contains(event.target) && !document.querySelector('button').contains(event.target)) {
+                modal.remove();  // 关闭播放记录窗口
+            }
+        }, true);
     }
 
     // 监测播放器并绑定事件
