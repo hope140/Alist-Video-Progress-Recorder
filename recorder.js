@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Alist-Video-Progress-Recorder
 // @namespace    http://tampermonkey.net/
-// @version      1.5
-// @description  修复记录视频名称在切换界面后被覆盖的问题
+// @version      1.6
+// @description  鼠标悬停0.5秒显示完整视频名称，使用矢量图标作为播放记录按钮
 // @author       hope140
 // @match        https://alist.510711.xyz/*
 // @match        http://192.168.0.100:5244/*
@@ -14,6 +14,7 @@
 
     let playbackHistory = [];
     let currentVideoUrl = '';  // 用于保存首次检测到的视频URL
+    let hoverTimeout;  // 记录鼠标悬停计时器
 
     // 时间格式化函数
     function formatTime(seconds) {
@@ -93,17 +94,18 @@
     // 创建播放记录按钮
     function createHistoryButton() {
         const historyButton = document.createElement('button');
-        historyButton.innerHTML = '📜';
+        historyButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h10m-6 4h6" />
+            </svg>
+        `;
         historyButton.style.position = 'fixed';
         historyButton.style.top = '20px';
         historyButton.style.left = '20px';
         historyButton.style.zIndex = '9999';
-        historyButton.style.padding = '10px';
-        historyButton.style.fontSize = '24px';
-        historyButton.style.backgroundColor = '#007BFF';
-        historyButton.style.color = '#fff';
-        historyButton.style.border = 'none';
-        historyButton.style.borderRadius = '5px';
+        historyButton.style.padding = '0';  // 去掉内边距
+        historyButton.style.background = 'none';  // 去掉背景
+        historyButton.style.border = 'none';  // 去掉边框
         historyButton.style.cursor = 'pointer';
 
         document.body.appendChild(historyButton);
@@ -118,6 +120,30 @@
         } else {
             displayPlaybackHistory();
         }
+    }
+
+    // 显示完整视频名称提示框
+    function showFullTitleTooltip(recordItem, fullFileName) {
+        const tooltip = document.createElement('div');
+        tooltip.id = 'tooltip';
+        tooltip.textContent = fullFileName;
+        tooltip.style.position = 'absolute';
+        tooltip.style.backgroundColor = '#fff';
+        tooltip.style.border = '1px solid #ccc';
+        tooltip.style.padding = '5px 10px';
+        tooltip.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+        tooltip.style.borderRadius = '5px';
+        tooltip.style.zIndex = '10001';
+        tooltip.style.whiteSpace = 'nowrap';
+        tooltip.style.top = `${recordItem.getBoundingClientRect().top - 30}px`;  // 在记录项上方显示
+        tooltip.style.left = `${recordItem.getBoundingClientRect().left}px`;
+
+        document.body.appendChild(tooltip);
+
+        recordItem.addEventListener('mouseleave', () => {
+            if (tooltip) tooltip.remove();
+            clearTimeout(hoverTimeout);  // 清除计时器
+        });
     }
 
     // 展示播放记录
@@ -152,9 +178,16 @@
 
                 recordItem.addEventListener('mouseover', () => {
                     recordItem.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+
+                    hoverTimeout = setTimeout(() => {
+                        const fullFileName = extractFileName(record.url);
+                        showFullTitleTooltip(recordItem, fullFileName);
+                    }, 500);  // 0.5秒后显示完整名称
                 });
+
                 recordItem.addEventListener('mouseout', () => {
                     recordItem.style.boxShadow = 'none';
+                    clearTimeout(hoverTimeout);  // 鼠标移出时取消显示
                 });
 
                 const fileName = extractFileName(record.url);
