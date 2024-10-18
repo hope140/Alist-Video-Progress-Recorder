@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Alist-Video-Progress-Recorder
 // @namespace    http://tampermonkey.net/
-// @version      1.4
-// @description  视频记录UI右对齐、播放时间格式优化
+// @version      1.5
+// @description  修复记录视频名称在切换界面后被覆盖的问题
 // @author       hope140
 // @match        https://alist.510711.xyz/*
 // @match        http://192.168.0.100:5244/*
@@ -13,13 +13,14 @@
     'use strict';
 
     let playbackHistory = [];
+    let currentVideoUrl = '';  // 用于保存首次检测到的视频URL
 
-    // 时间格式化函数，将秒数转化为 "xx:xx:xx" 或 "xx:xx" 格式
+    // 时间格式化函数
     function formatTime(seconds) {
-        const h = Math.floor(seconds / 3600);
+        const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
         const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
         const s = Math.floor(seconds % 60).toString().padStart(2, '0');
-        return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`; // 如果不足一小时，不显示小时
+        return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
     }
 
     // 记录时间格式化函数
@@ -41,20 +42,21 @@
         }
     }
 
-    // 去除URL中的域名/IP和文件扩展名，提取视频名称
+    // 提取视频名称
     function extractFileName(url) {
+        if (!url) return null;
         const decodedUrl = decodeURIComponent(url);
-        const fileNameWithExtension = decodedUrl.split('/').pop(); // 获取最后一部分
-        const fileName = fileNameWithExtension.replace(/\.[^/.]+$/, ''); // 去除扩展名
+        const fileNameWithExtension = decodedUrl.split('/').pop();
+        const fileName = fileNameWithExtension.replace(/\.[^/.]+$/, '');
         return fileName;
     }
 
-    // 定义保存视频进度的函数
+    // 保存视频进度
     function saveVideoProgress(videoUrl, currentTime, duration) {
         let videoHistory = JSON.parse(localStorage.getItem('videoPlaybackHistory')) || [];
         const existingRecordIndex = videoHistory.findIndex(record => record.url === videoUrl);
 
-        let isWatched = currentTime >= duration - 30; // 如果当前时间接近视频时长，认为已看完
+        let isWatched = currentTime >= duration - 30;
 
         if (existingRecordIndex !== -1) {
             videoHistory[existingRecordIndex].time = currentTime;
@@ -62,7 +64,7 @@
             videoHistory[existingRecordIndex].isWatched = isWatched;
             videoHistory[existingRecordIndex].duration = duration;
         } else {
-            videoHistory.push({
+            videoHistory.unshift({
                 url: videoUrl,
                 time: currentTime,
                 date: new Date().toLocaleString(),
@@ -72,15 +74,19 @@
         }
 
         if (videoHistory.length > 5) {
-            videoHistory.shift(); // 限制为最近的五条记录
+            videoHistory.pop();
         }
 
+        videoHistory = videoHistory.filter(record => record.url && extractFileName(record.url));
         localStorage.setItem('videoPlaybackHistory', JSON.stringify(videoHistory));
     }
 
-    // 定义加载播放历史的函数
+    // 加载播放历史
     function loadPlaybackHistory() {
         playbackHistory = JSON.parse(localStorage.getItem('videoPlaybackHistory')) || [];
+        playbackHistory = playbackHistory.filter(record => record.url && extractFileName(record.url));
+        playbackHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+        localStorage.setItem('videoPlaybackHistory', JSON.stringify(playbackHistory));
         return playbackHistory;
     }
 
@@ -90,23 +96,21 @@
         historyButton.innerHTML = '📜';
         historyButton.style.position = 'fixed';
         historyButton.style.top = '20px';
-        historyButton.style.left = '20px'; // 左侧放置按钮
+        historyButton.style.left = '20px';
         historyButton.style.zIndex = '9999';
         historyButton.style.padding = '10px';
         historyButton.style.fontSize = '24px';
         historyButton.style.backgroundColor = '#007BFF';
         historyButton.style.color = '#fff';
         historyButton.style.border = 'none';
-        historyButton.style.borderRadius = '5px'; // 圆角按钮
+        historyButton.style.borderRadius = '5px';
         historyButton.style.cursor = 'pointer';
 
         document.body.appendChild(historyButton);
-
-        // 点击按钮显示/关闭记录
         historyButton.addEventListener('click', togglePlaybackHistory);
     }
 
-    // 切换显示/隐藏播放记录弹窗
+    // 切换显示/隐藏播放记录
     function togglePlaybackHistory() {
         const existingModal = document.querySelector('#historyModal');
         if (existingModal) {
@@ -116,25 +120,23 @@
         }
     }
 
-    // 创建并展示播放记录弹窗
+    // 展示播放记录
     function displayPlaybackHistory() {
         loadPlaybackHistory();
 
         const modal = document.createElement('div');
         modal.id = 'historyModal';
         modal.style.position = 'absolute';
-        modal.style.top = '60px'; // 紧贴按钮下方
-        modal.style.left = '20px'; // 紧贴左侧按钮
+        modal.style.top = '60px';
+        modal.style.left = '20px';
         modal.style.zIndex = '10000';
         modal.style.padding = '10px';
         modal.style.backgroundColor = '#fff';
         modal.style.border = '1px solid #ccc';
         modal.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
-        modal.style.borderRadius = '8px'; // 圆角设计
-        modal.style.maxWidth = '400px'; // 自适应宽度
-        modal.style.fontFamily = 'Arial, sans-serif'; // 设置字体
+        modal.style.borderRadius = '8px';
+        modal.style.maxWidth = '400px';
 
-        // 展示播放记录
         if (playbackHistory.length === 0) {
             const noHistory = document.createElement('p');
             noHistory.textContent = '没有播放记录';
@@ -147,10 +149,7 @@
                 recordItem.style.cursor = 'pointer';
                 recordItem.style.transition = 'box-shadow 0.3s';
                 recordItem.style.boxShadow = 'none';
-                recordItem.style.display = 'flex'; // 使用 flex 布局
-                recordItem.style.justifyContent = 'space-between'; // 右对齐视频名和时间
 
-                // 鼠标移入移出效果
                 recordItem.addEventListener('mouseover', () => {
                     recordItem.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
                 });
@@ -159,28 +158,22 @@
                 });
 
                 const fileName = extractFileName(record.url);
-                const formattedTime = record.isWatched ? '已看完' : `${formatTime(record.time)}/${formatTime(record.duration)}`;
+                const shortFileName = fileName.length > 20 ? fileName.slice(0, 20) + '...' : fileName;
+                const formattedTime = record.isWatched ? '已看完' : `${formatTime(record.time)} / ${formatTime(record.duration)}`;
                 const formattedDate = formatDate(record.date);
 
-                // 创建文件名部分
-                const fileNameElem = document.createElement('span');
-                fileNameElem.textContent = `#${index + 1} ${fileName}`;
-                fileNameElem.style.color = '#007BFF'; // 蓝色显示
-                fileNameElem.style.textDecoration = 'underline'; // 下划线
-                fileNameElem.style.flex = '1'; // 文件名占据左侧
+                const recordItemContent = `
+                    <strong>#${index + 1}</strong> ${shortFileName}<br>
+                    <div style="display: flex; justify-content: flex-end;">
+                        <small>${formattedTime} | ${formattedDate}</small>
+                    </div>
+                `;
 
-                // 创建时间部分
-                const timeElem = document.createElement('span');
-                timeElem.textContent = `${formattedTime} | ${formattedDate}`;
-                timeElem.style.flex = '0'; // 时间部分占据右侧
-
-                // 点击记录跳转到对应视频
+                recordItem.innerHTML = recordItemContent;
                 recordItem.addEventListener('click', () => {
                     window.location.href = record.url;
                 });
 
-                recordItem.appendChild(fileNameElem);
-                recordItem.appendChild(timeElem);
                 modal.appendChild(recordItem);
             });
         }
@@ -188,7 +181,7 @@
         document.body.appendChild(modal);
     }
 
-    // 查找art-video播放器并绑定事件
+    // 监测播放器并绑定事件
     function monitorVideoByClass() {
         const intervalId = setInterval(() => {
             const videoElement = document.querySelector('.art-video');
@@ -197,18 +190,21 @@
                 clearInterval(intervalId);
                 console.log('art-video 视频元素已检测到');
 
+                if (!currentVideoUrl) {
+                    currentVideoUrl = window.location.href;  // 只在首次播放时保存视频URL
+                }
+
                 videoElement.addEventListener('timeupdate', () => {
                     const currentTime = videoElement.currentTime;
                     const duration = videoElement.duration;
-                    const videoUrl = window.location.href;
 
                     if (Math.floor(currentTime) % 5 === 0) {
-                        saveVideoProgress(videoUrl, currentTime, duration);
+                        saveVideoProgress(currentVideoUrl, currentTime, duration);
                     }
                 });
 
                 window.addEventListener('beforeunload', () => {
-                    saveVideoProgress(window.location.href, videoElement.currentTime, videoElement.duration);
+                    saveVideoProgress(currentVideoUrl, videoElement.currentTime, videoElement.duration);
                 });
             }
         }, 1000);
