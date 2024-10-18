@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Alist-Video-Progress-Recorder
 // @namespace    http://tampermonkey.net/
-// @version      1.8
-// @description  图标反相效果，点击空白处关闭播放记录
+// @version      1.9
+// @description  图标圆角化处理，去除边框
 // @author       hope140
 // @match        https://alist.510711.xyz/*
 // @match        http://192.168.0.100:5244/*
@@ -95,36 +95,39 @@
 
     // 创建播放记录按钮
     function createHistoryButton() {
-        const historyButton = document.createElement('button');
+        const historyButton = document.createElement('div'); // 使用 div 作为按钮容器
         historyButton.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="rgb(24, 144, 255)" id="history-icon">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h10m-6 4h6" />
-            </svg>
-        `;
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="rgb(24, 144, 255)" id="history-icon">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h10m-6 4h6" />
+        </svg>
+    `;
         historyButton.style.position = 'fixed';
         historyButton.style.top = '20px';
         historyButton.style.left = '20px';
         historyButton.style.zIndex = '9999';
-        historyButton.style.padding = '0';  // 去掉内边距
-        historyButton.style.background = 'none';  // 去掉背景
-        historyButton.style.border = 'none';  // 去掉边框
+        historyButton.style.padding = '5px';  // 添加内边距
+        historyButton.style.background = 'white';  // 设置默认背景颜色
+        historyButton.style.borderRadius = '10px';  // 添加圆角
         historyButton.style.cursor = 'pointer';
+        historyButton.style.outline = 'none';  // 去掉点击时的黑色边框
 
-        // 添加鼠标悬停反相效果
+        // 鼠标悬停时更改背景颜色和图标颜色
         historyButton.onmouseover = function() {
+            historyButton.style.backgroundColor = 'rgb(24, 144, 255)'; // 鼠标悬停时背景变蓝
             const icon = document.getElementById('history-icon');
-            icon.style.backgroundColor = 'rgb(24, 144, 255)';
-            icon.style.stroke = 'white';
+            icon.style.stroke = 'white';  // 鼠标悬停时图标变白
         };
+
         historyButton.onmouseout = function() {
+            historyButton.style.backgroundColor = 'white'; // 鼠标移开时恢复背景色
             const icon = document.getElementById('history-icon');
-            icon.style.backgroundColor = 'white';
-            icon.style.stroke = 'rgb(24, 144, 255)';
+            icon.style.stroke = 'rgb(24, 144, 255)'; // 恢复图标颜色
         };
 
         document.body.appendChild(historyButton);
         historyButton.addEventListener('click', togglePlaybackHistory);
     }
+
 
     // 切换显示/隐藏播放记录
     function togglePlaybackHistory() {
