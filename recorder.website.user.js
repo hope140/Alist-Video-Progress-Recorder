@@ -236,25 +236,33 @@ function displayPlaybackHistory() {
     }, true);
 }
 
-
-// 监听当前视频播放进度
-function monitorVideoProgress() {
-    const videoElement = document.querySelector('video'); // 根据具体选择器选择视频元素
-    if (!videoElement) return;
-
-    currentVideoUrl = window.location.href;
-
+// 监测播放器并绑定事件
+function monitorVideoByClass() {
     const intervalId = setInterval(() => {
-        const currentTime = videoElement.currentTime;
-        const duration = videoElement.duration;
+        const videoElement = document.querySelector('.art-video');
 
-        saveVideoProgress(currentVideoUrl, currentTime, duration);
-    }, 30000); // 每30秒记录一次播放进度
+        if (videoElement) {
+            clearInterval(intervalId);
+            console.log('.art-video 视频元素已检测到');
 
-    // 当用户关闭页面时清理定时器
-    window.addEventListener('beforeunload', () => {
-        clearInterval(intervalId);
-    });
+            if (!currentVideoUrl) {
+                currentVideoUrl = window.location.href;  // 只在首次播放时保存视频URL
+            }
+
+            videoElement.addEventListener('timeupdate', () => {
+                const currentTime = videoElement.currentTime;
+                const duration = videoElement.duration;
+
+                if (Math.floor(currentTime) % 5 === 0) {
+                    saveVideoProgress(currentVideoUrl, currentTime, duration);
+                }
+            });
+
+            window.addEventListener('beforeunload', () => {
+                saveVideoProgress(currentVideoUrl, videoElement.currentTime, videoElement.duration);
+            });
+        }
+    }, 1000);
 }
 
 // 初始化函数
