@@ -4,6 +4,9 @@
 // @version      2.0
 // @description  声明 historyButton 为全局变量,做到可以点击空白处关闭
 // @author       hope140
+// @icon         data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='none' viewBox='0 0 24 24' stroke='rgb(24, 144, 255)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M7 8h10M7 12h10m-6 4h6' /%3E%3C/svg%3E
+// @updateURL    https://github.com/hope140/Alist-Video-Progress-Recorder/raw/refs/heads/main/recorder_hope.user.js
+// @downloadURL  https://github.com/hope140/Alist-Video-Progress-Recorder/raw/refs/heads/main/recorder_hope.user.js
 // @match        https://alist.510711.xyz/*
 // @match        http://192.168.0.100:5244/*
 // @exclude      https://alist.510711.xyz/@manage*
