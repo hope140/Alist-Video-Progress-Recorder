@@ -4,7 +4,10 @@
 // @version      2.0
 // @description  声明 historyButton 为全局变量,做到可以点击空白处关闭
 // @author       hope140
-// @match        *://*/*
+// @match        https://alist.510711.xyz/*
+// @match        http://192.168.0.100:5244/*
+// @exclude      https://alist.510711.xyz/@manage*
+// @exclude      http://192.168.0.100:5244/@manage*
 // @grant        none
 // ==/UserScript==
 
