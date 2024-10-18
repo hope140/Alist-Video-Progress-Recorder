@@ -1,277 +1,258 @@
-// 这是一个普通的 JavaScript 脚本，可以在网站自定义头部使用
+// 普通 JavaScript 脚本
 
-(function () {
-	'use strict';
+let playbackHistory = [];
+let currentVideoUrl = '';  // 用于保存首次检测到的视频URL
+let hoverTimeout;  // 记录鼠标悬停计时器
+let historyButton; // 声明全局变量，用于按钮
 
-	// 检查当前URL，如果匹配/@manage*路径，则停止执行
-	if (window.location.pathname.includes('/@manage')) {
-		return; // 不执行后续代码
-	}
+// 时间格式化函数
+function formatTime(seconds) {
+    const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+    const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+    const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+    return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
+}
 
-	let playbackHistory = [];
-	let currentVideoUrl = '';  // 用于保存首次检测到的视频URL
-	let hoverTimeout;  // 记录鼠标悬停计时器
-	let historyButton; // 声明全局变量，用于按钮
+// 记录时间格式化函数
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
 
-	// 时间格式化函数
-	function formatTime(seconds) {
-		const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
-		const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
-		const s = Math.floor(seconds % 60).toString().padStart(2, '0');
-		return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
-	}
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
 
-	// 记录时间格式化函数
-	function formatDate(dateString) {
-		const date = new Date(dateString);
-		const today = new Date();
-		const yesterday = new Date(today);
-		yesterday.setDate(today.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) {
+        return `今天 ${hours}:${minutes}`;
+    } else if (date.toDateString() === yesterday.toDateString()) {
+        return `昨天 ${hours}:${minutes}`;
+    } else {
+        return `${date.getMonth() + 1}-${date.getDate()} ${hours}:${minutes}`;
+    }
+}
 
-		const hours = date.getHours().toString().padStart(2, '0');
-		const minutes = date.getMinutes().toString().padStart(2, '0');
+// 提取视频名称
+function extractFileName(url) {
+    if (!url) return null;
+    const decodedUrl = decodeURIComponent(url);
+    const fileNameWithExtension = decodedUrl.split('/').pop();
+    const fileName = fileNameWithExtension.replace(/\.[^/.]+$/, '');
+    return fileName;
+}
 
-		if (date.toDateString() === today.toDateString()) {
-			return `今天 ${hours}:${minutes}`;
-		} else if (date.toDateString() === yesterday.toDateString()) {
-			return `昨天 ${hours}:${minutes}`;
-		} else {
-			return `${date.getMonth() + 1}-${date.getDate()} ${hours}:${minutes}`;
-		}
-	}
+// 保存视频进度
+function saveVideoProgress(videoUrl, currentTime, duration) {
+    let videoHistory = JSON.parse(localStorage.getItem('videoPlaybackHistory')) || [];
+    const existingRecordIndex = videoHistory.findIndex(record => record.url === videoUrl);
 
-	// 提取视频名称
-	function extractFileName(url) {
-		if (!url) return null;
-		const decodedUrl = decodeURIComponent(url);
-		const fileNameWithExtension = decodedUrl.split('/').pop();
-		const fileName = fileNameWithExtension.replace(/\.[^/.]+$/, '');
-		return fileName;
-	}
+    let isWatched = currentTime >= duration - 30;
 
-	// 保存视频进度
-	function saveVideoProgress(videoUrl, currentTime, duration) {
-		let videoHistory = JSON.parse(localStorage.getItem('videoPlaybackHistory')) || [];
-		const existingRecordIndex = videoHistory.findIndex(record => record.url === videoUrl);
+    if (existingRecordIndex !== -1) {
+        videoHistory[existingRecordIndex].time = currentTime;
+        videoHistory[existingRecordIndex].date = new Date().toLocaleString();
+        videoHistory[existingRecordIndex].isWatched = isWatched;
+        videoHistory[existingRecordIndex].duration = duration;
+    } else {
+        videoHistory.unshift({
+            url: videoUrl,
+            time: currentTime,
+            date: new Date().toLocaleString(),
+            isWatched: isWatched,
+            duration: duration
+        });
+    }
 
-		let isWatched = currentTime >= duration - 30;
+    if (videoHistory.length > 5) {
+        videoHistory.pop();
+    }
 
-		if (existingRecordIndex !== -1) {
-			videoHistory[existingRecordIndex].time = currentTime;
-			videoHistory[existingRecordIndex].date = new Date().toLocaleString();
-			videoHistory[existingRecordIndex].isWatched = isWatched;
-			videoHistory[existingRecordIndex].duration = duration;
-		} else {
-			videoHistory.unshift({
-				url: videoUrl,
-				time: currentTime,
-				date: new Date().toLocaleString(),
-				isWatched: isWatched,
-				duration: duration
-			});
-		}
+    videoHistory = videoHistory.filter(record => record.url && extractFileName(record.url));
+    localStorage.setItem('videoPlaybackHistory', JSON.stringify(videoHistory));
+}
 
-		if (videoHistory.length > 5) {
-			videoHistory.pop();
-		}
+// 加载播放历史
+function loadPlaybackHistory() {
+    playbackHistory = JSON.parse(localStorage.getItem('videoPlaybackHistory')) || [];
+    playbackHistory = playbackHistory.filter(record => record.url && extractFileName(record.url));
+    playbackHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+    localStorage.setItem('videoPlaybackHistory', JSON.stringify(playbackHistory));
+    return playbackHistory;
+}
 
-		videoHistory = videoHistory.filter(record => record.url && extractFileName(record.url));
-		localStorage.setItem('videoPlaybackHistory', JSON.stringify(videoHistory));
-	}
+// 切换显示/隐藏播放记录
+function togglePlaybackHistory() {
+    const existingModal = document.querySelector('#historyModal');
+    if (existingModal) {
+        existingModal.remove(); // 如果存在播放记录窗口，则关闭它
+    } else {
+        displayPlaybackHistory(); // 否则显示播放记录窗口
+    }
+}
 
-	// 加载播放历史
-	function loadPlaybackHistory() {
-		playbackHistory = JSON.parse(localStorage.getItem('videoPlaybackHistory')) || [];
-		playbackHistory = playbackHistory.filter(record => record.url && extractFileName(record.url));
-		playbackHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
-		localStorage.setItem('videoPlaybackHistory', JSON.stringify(playbackHistory));
-		return playbackHistory;
-	}
+// 创建播放记录按钮
+function createHistoryButton() {
+    historyButton = document.createElement('div'); // 使用 div 作为按钮容器
+    historyButton.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="rgb(24, 144, 255)" id="history-icon">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h10m-6 4h6" />
+        </svg>
+    `;
+    historyButton.style.position = 'fixed';
+    historyButton.style.top = '20px';
+    historyButton.style.left = '20px';
+    historyButton.style.zIndex = '9999';
+    historyButton.style.padding = '5px';  // 添加内边距
+    historyButton.style.background = 'white';  // 设置默认背景颜色
+    historyButton.style.borderRadius = '10px';  // 添加圆角
+    historyButton.style.cursor = 'pointer';
+    historyButton.style.outline = 'none';  // 去掉点击时的黑色边框
 
-	// 切换显示/隐藏播放记录
-	function togglePlaybackHistory() {
-		const existingModal = document.querySelector('#historyModal');
-		if (existingModal) {
-			existingModal.remove(); // 如果存在播放记录窗口，则关闭它
-		} else {
-			displayPlaybackHistory(); // 否则显示播放记录窗口
-		}
-	}
+    // 鼠标悬停时更改背景颜色和图标颜色
+    historyButton.onmouseover = function () {
+        historyButton.style.backgroundColor = 'rgb(24, 144, 255)'; // 鼠标悬停时背景变蓝
+        const icon = document.getElementById('history-icon');
+        icon.style.stroke = 'white';  // 鼠标悬停时图标变白
+    };
 
-	// 创建播放记录按钮
-	function createHistoryButton() {
-		historyButton = document.createElement('div'); // 使用 div 作为按钮容器
-		historyButton.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="rgb(24, 144, 255)" id="history-icon">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h10m-6 4h6" />
-            </svg>
-        `;
-		historyButton.style.position = 'fixed';
-		historyButton.style.top = '20px';
-		historyButton.style.left = '20px';
-		historyButton.style.zIndex = '9999';
-		historyButton.style.padding = '5px';  // 添加内边距
-		historyButton.style.background = 'white';  // 设置默认背景颜色
-		historyButton.style.borderRadius = '10px';  // 添加圆角
-		historyButton.style.cursor = 'pointer';
-		historyButton.style.outline = 'none';  // 去掉点击时的黑色边框
+    historyButton.onmouseout = function () {
+        historyButton.style.backgroundColor = 'white'; // 鼠标移开时恢复背景色
+        const icon = document.getElementById('history-icon');
+        icon.style.stroke = 'rgb(24, 144, 255)'; // 恢复图标颜色
+    };
 
-		// 鼠标悬停时更改背景颜色和图标颜色
-		historyButton.onmouseover = function () {
-			historyButton.style.backgroundColor = 'rgb(24, 144, 255)'; // 鼠标悬停时背景变蓝
-			const icon = document.getElementById('history-icon');
-			icon.style.stroke = 'white';  // 鼠标悬停时图标变白
-		};
+    document.body.appendChild(historyButton);
 
-		historyButton.onmouseout = function () {
-			historyButton.style.backgroundColor = 'white'; // 鼠标移开时恢复背景色
-			const icon = document.getElementById('history-icon');
-			icon.style.stroke = 'rgb(24, 144, 255)'; // 恢复图标颜色
-		};
+    // 点击按钮切换播放记录窗口
+    historyButton.addEventListener('click', (event) => {
+        togglePlaybackHistory(); // 切换播放记录窗口
+    });
+}
 
-		document.body.appendChild(historyButton);
+// 显示完整视频标题的工具提示
+function showFullTitleTooltip(element, fullTitle) {
+    const tooltip = document.createElement('div');
+    tooltip.textContent = fullTitle;
+    tooltip.style.position = 'absolute';
+    tooltip.style.backgroundColor = '#fff';
+    tooltip.style.border = '1px solid #ccc';
+    tooltip.style.padding = '5px';
+    tooltip.style.borderRadius = '4px';
+    tooltip.style.zIndex = '10001'; // 确保工具提示在其他元素上方
+    tooltip.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
+    tooltip.style.whiteSpace = 'nowrap';
 
-		// 点击按钮切换播放记录窗口
-		historyButton.addEventListener('click', (event) => {
-			togglePlaybackHistory(); // 切换播放记录窗口
-			// 不再阻止事件冒泡，以允许点击空白处关闭窗口
-		});
-	}
+    // 计算工具提示位置
+    const rect = element.getBoundingClientRect();
+    tooltip.style.top = `${rect.top + window.scrollY - 30}px`; // 在元素上方显示
+    tooltip.style.left = `${rect.left + window.scrollX}px`;
 
-	// 显示完整视频标题的工具提示
-	function showFullTitleTooltip(element, fullTitle) {
-		const tooltip = document.createElement('div');
-		tooltip.textContent = fullTitle;
-		tooltip.style.position = 'absolute';
-		tooltip.style.backgroundColor = '#fff';
-		tooltip.style.border = '1px solid #ccc';
-		tooltip.style.padding = '5px';
-		tooltip.style.borderRadius = '4px';
-		tooltip.style.zIndex = '10001'; // 确保工具提示在其他元素上方
-		tooltip.style.boxShadow = '0 2px 5px rgba(0, 0, 0, 0.2)';
-		tooltip.style.whiteSpace = 'nowrap';
+    document.body.appendChild(tooltip);
 
-		// 计算工具提示位置
-		const rect = element.getBoundingClientRect();
-		tooltip.style.top = `${rect.top + window.scrollY - 30}px`; // 在元素上方显示
-		tooltip.style.left = `${rect.left + window.scrollX}px`;
+    // 鼠标移出时移除工具提示
+    element.onmouseleave = function () {
+        tooltip.remove();
+    };
+}
 
-		document.body.appendChild(tooltip);
+// 展示播放记录
+function displayPlaybackHistory() {
+    loadPlaybackHistory();
 
-		// 鼠标移出时移除工具提示
-		element.onmouseleave = function () {
-			tooltip.remove();
-		};
-	}
+    const modal = document.createElement('div');
+    modal.id = 'historyModal';
+    modal.style.position = 'absolute';
+    modal.style.top = '60px';
+    modal.style.left = '20px';
+    modal.style.zIndex = '10000';
+    modal.style.padding = '10px';
+    modal.style.backgroundColor = '#fff';
+    modal.style.border = '1px solid #ccc';
+    modal.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
+    modal.style.borderRadius = '8px';
+    modal.style.maxWidth = '400px';
 
-	// 展示播放记录
-	function displayPlaybackHistory() {
-		loadPlaybackHistory();
+    if (playbackHistory.length === 0) {
+        const noHistory = document.createElement('p');
+        noHistory.textContent = '没有播放记录';
+        modal.appendChild(noHistory);
+    } else {
+        playbackHistory.forEach((record, index) => {
+            const recordItem = document.createElement('div');
+            recordItem.style.padding = '5px 0';
+            recordItem.style.borderBottom = '1px solid #eee';
+            recordItem.style.cursor = 'pointer';
+            recordItem.style.transition = 'box-shadow 0.3s';
+            recordItem.style.boxShadow = 'none';
+            recordItem.style.display = 'flex';
+            recordItem.style.flexDirection = 'column'; // 使内容分为两行
+            recordItem.style.alignItems = 'flex-start'; // 左对齐
 
-		const modal = document.createElement('div');
-		modal.id = 'historyModal';
-		modal.style.position = 'absolute';
-		modal.style.top = '60px';
-		modal.style.left = '20px';
-		modal.style.zIndex = '10000';
-		modal.style.padding = '10px';
-		modal.style.backgroundColor = '#fff';
-		modal.style.border = '1px solid #ccc';
-		modal.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
-		modal.style.borderRadius = '8px';
-		modal.style.maxWidth = '400px';
+            recordItem.addEventListener('mouseover', () => {
+                recordItem.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
 
-		if (playbackHistory.length === 0) {
-			const noHistory = document.createElement('p');
-			noHistory.textContent = '没有播放记录';
-			modal.appendChild(noHistory);
-		} else {
-			playbackHistory.forEach((record, index) => {
-				const recordItem = document.createElement('div');
-				recordItem.style.padding = '5px 0';
-				recordItem.style.borderBottom = '1px solid #eee';
-				recordItem.style.cursor = 'pointer';
-				recordItem.style.transition = 'box-shadow 0.3s';
-				recordItem.style.boxShadow = 'none';
+                hoverTimeout = setTimeout(() => {
+                    const fullFileName = extractFileName(record.url);
+                    showFullTitleTooltip(recordItem, fullFileName);
+                }, 500);  // 0.5秒后显示完整名称
+            });
 
-				recordItem.addEventListener('mouseover', () => {
-					recordItem.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+            recordItem.addEventListener('mouseout', () => {
+                recordItem.style.boxShadow = 'none';
+                clearTimeout(hoverTimeout);  // 鼠标移出时取消显示
+            });
 
-					hoverTimeout = setTimeout(() => {
-						const fullFileName = extractFileName(record.url);
-						showFullTitleTooltip(recordItem, fullFileName);
-					}, 500);  // 0.5秒后显示完整名称
-				});
+            const fileName = extractFileName(record.url);
+            const shortFileName = fileName.length > 20 ? fileName.slice(0, 20) + '...' : fileName;
+            const formattedTime = record.isWatched ? '已看完' : `${formatTime(record.time)} / ${formatTime(record.duration)}`;
+            const formattedDate = formatDate(record.date);
+            const indexDisplay = `<strong>#${index + 1}</strong>`; // 添加序号
 
-				recordItem.addEventListener('mouseout', () => {
-					recordItem.style.boxShadow = 'none';
-					clearTimeout(hoverTimeout);  // 鼠标移出时取消显示
-				});
+            recordItem.innerHTML = `
+                <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    ${indexDisplay} ${shortFileName}
+                </div>
+                <div style="display: flex; justify-content: flex-end; align-items: center; width: 100%; margin-top: 4px; font-size: 12px;">
+                    <div style="text-align: right; margin-right: 2px;">${formattedTime} <span style="margin: 0 2px;">|</span></div>
+                    <div style="text-align: right;">${formattedDate}</div>
+                </div>
+            `;
 
-				const fileName = extractFileName(record.url);
-				const shortFileName = fileName.length > 20 ? fileName.slice(0, 20) + '...' : fileName;
-				const formattedTime = record.isWatched ? '已看完' : `${formatTime(record.time)} / ${formatTime(record.duration)}`;
-				const formattedDate = formatDate(record.date);
+            recordItem.addEventListener('click', () => {
+                window.location.href = record.url; // 点击后跳转到对应视频
+            });
 
-				const recordItemContent = `
-                    <strong>#${index + 1}</strong> ${shortFileName}<br>
-                    <div style="display: flex; justify-content: flex-end;">
-                        <small>${formattedTime} | ${formattedDate}</small>
-                    </div>
-                `;
+            modal.appendChild(recordItem);
+        });
+    }
 
-				recordItem.innerHTML = recordItemContent;
-				recordItem.addEventListener('click', () => {
-					window.location.href = record.url;
-				});
+    document.body.appendChild(modal);
+}
 
-				modal.appendChild(recordItem);
-			});
-		}
+// 监听当前视频播放进度
+function monitorVideoProgress() {
+    const videoElement = document.querySelector('video'); // 根据具体选择器选择视频元素
+    if (!videoElement) return;
 
-		document.body.appendChild(modal);
+    currentVideoUrl = window.location.href;
 
-		// 点击空白处关闭播放记录界面
-		document.addEventListener('click', function (event) {
-			if (!modal.contains(event.target) && !historyButton.contains(event.target)) {
-				modal.remove();  // 关闭播放记录窗口
-			}
-		}, true);
-	}
+    const intervalId = setInterval(() => {
+        const currentTime = videoElement.currentTime;
+        const duration = videoElement.duration;
 
-	// 监测播放器并绑定事件
-	function monitorVideoByClass() {
-		const intervalId = setInterval(() => {
-			const videoElement = document.querySelector('.art-video');
+        saveVideoProgress(currentVideoUrl, currentTime, duration);
+    }, 30000); // 每30秒记录一次播放进度
 
-			if (videoElement) {
-				clearInterval(intervalId);
-				console.log('art-video 视频元素已检测到');
+    // 当用户关闭页面时清理定时器
+    window.addEventListener('beforeunload', () => {
+        clearInterval(intervalId);
+    });
+}
 
-				if (!currentVideoUrl) {
-					currentVideoUrl = window.location.href;  // 只在首次播放时保存视频URL
-				}
+// 初始化函数
+function init() {
+    createHistoryButton(); // 创建播放记录按钮
+    monitorVideoProgress(); // 监控视频播放进度
+}
 
-				videoElement.addEventListener('timeupdate', () => {
-					const currentTime = videoElement.currentTime;
-					const duration = videoElement.duration;
-
-					if (Math.floor(currentTime) % 5 === 0) {
-						saveVideoProgress(currentVideoUrl, currentTime, duration);
-					}
-				});
-
-				window.addEventListener('beforeunload', () => {
-					saveVideoProgress(currentVideoUrl, videoElement.currentTime, videoElement.duration);
-				});
-			}
-		}, 1000);
-	}
-
-	function init() {
-		createHistoryButton();
-		monitorVideoByClass();
-	}
-
-	window.addEventListener('load', init);
-})();
+init();
