@@ -227,7 +227,15 @@ function displayPlaybackHistory() {
     }
 
     document.body.appendChild(modal);
+
+    // 点击空白处关闭播放记录界面
+    document.addEventListener('click', function (event) {
+        if (!modal.contains(event.target) && !historyButton.contains(event.target)) {
+            modal.remove();  // 关闭播放记录窗口
+        }
+    }, true);
 }
+
 
 // 监听当前视频播放进度
 function monitorVideoProgress() {
