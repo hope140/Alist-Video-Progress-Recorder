@@ -3,6 +3,11 @@
 (function() {
     'use strict';
 
+    // 检查当前URL，如果匹配/@manage*路径，则停止执行
+    if (window.location.pathname.includes('/@manage')) {
+        return; // 不执行后续代码
+    }
+
     let playbackHistory = [];
     let currentVideoUrl = '';  // 用于保存首次检测到的视频URL
     let hoverTimeout;  // 记录鼠标悬停计时器
