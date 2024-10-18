@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Alist-Video-Progress-Recorder
 // @namespace    http://tampermonkey.net/
-// @version      1.3
-// @description  记录点击跳转、时间显示优化、状态显示“已看完”
+// @version      1.4
+// @description  视频记录UI右对齐、播放时间格式优化
 // @author       hope140
 // @match        https://alist.510711.xyz/*
 // @match        http://192.168.0.100:5244/*
@@ -14,12 +14,12 @@
 
     let playbackHistory = [];
 
-    // 时间格式化函数，将秒数转化为 "xx:xx:xx" 的格式
+    // 时间格式化函数，将秒数转化为 "xx:xx:xx" 或 "xx:xx" 格式
     function formatTime(seconds) {
-        const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+        const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
         const s = Math.floor(seconds % 60).toString().padStart(2, '0');
-        return `${h}:${m}:${s}`;
+        return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`; // 如果不足一小时，不显示小时
     }
 
     // 记录时间格式化函数
@@ -132,6 +132,7 @@
         modal.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
         modal.style.borderRadius = '8px'; // 圆角设计
         modal.style.maxWidth = '400px'; // 自适应宽度
+        modal.style.fontFamily = 'Arial, sans-serif'; // 设置字体
 
         // 展示播放记录
         if (playbackHistory.length === 0) {
@@ -146,6 +147,8 @@
                 recordItem.style.cursor = 'pointer';
                 recordItem.style.transition = 'box-shadow 0.3s';
                 recordItem.style.boxShadow = 'none';
+                recordItem.style.display = 'flex'; // 使用 flex 布局
+                recordItem.style.justifyContent = 'space-between'; // 右对齐视频名和时间
 
                 // 鼠标移入移出效果
                 recordItem.addEventListener('mouseover', () => {
@@ -159,16 +162,25 @@
                 const formattedTime = record.isWatched ? '已看完' : `${formatTime(record.time)}/${formatTime(record.duration)}`;
                 const formattedDate = formatDate(record.date);
 
-                recordItem.innerHTML = `
-                    <strong>#${index + 1}</strong> ${fileName}<br>
-                    <small>${formattedTime} | ${formattedDate}</small>
-                `;
+                // 创建文件名部分
+                const fileNameElem = document.createElement('span');
+                fileNameElem.textContent = `#${index + 1} ${fileName}`;
+                fileNameElem.style.color = '#007BFF'; // 蓝色显示
+                fileNameElem.style.textDecoration = 'underline'; // 下划线
+                fileNameElem.style.flex = '1'; // 文件名占据左侧
+
+                // 创建时间部分
+                const timeElem = document.createElement('span');
+                timeElem.textContent = `${formattedTime} | ${formattedDate}`;
+                timeElem.style.flex = '0'; // 时间部分占据右侧
 
                 // 点击记录跳转到对应视频
                 recordItem.addEventListener('click', () => {
                     window.location.href = record.url;
                 });
 
+                recordItem.appendChild(fileNameElem);
+                recordItem.appendChild(timeElem);
                 modal.appendChild(recordItem);
             });
         }
