@@ -2,7 +2,7 @@
 // @name         Alist-Video-Progress-Recorder
 // @namespace    http://tampermonkey.net/
 // @version      1.1
-// @description  记录并显示最近的五次ArtPlayer视频播放进度（基于art-video类检测）
+// @description  优化播放记录界面，显示解码的URL、格式化时间，并使用图标按钮
 // @author       hope140
 // @match        https://alist.510711.xyz/*
 // @match        http://192.168.0.100:5244/*
@@ -14,6 +14,14 @@
 
     // 全局变量
     let playbackHistory = [];
+
+    // 时间格式化函数，将秒数转化为 "xx:xx:xx" 的格式
+    function formatTime(seconds) {
+        const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+        const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+        const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+        return `${h}:${m}:${s}`;
+    }
 
     // 定义保存视频进度的函数
     function saveVideoProgress(videoUrl, currentTime) {
@@ -54,37 +62,40 @@
         return playbackHistory;
     }
 
-    // 创建一个按钮来显示播放记录
+    // 创建播放记录图标按钮
     function createHistoryButton() {
         const historyButton = document.createElement('button');
-        historyButton.textContent = '播放记录';
+        historyButton.innerHTML = '📜'; // 使用常见的播放记录图标替代文本
         historyButton.style.position = 'fixed';
         historyButton.style.top = '20px';
         historyButton.style.right = '20px';
         historyButton.style.zIndex = '9999';
         historyButton.style.padding = '10px';
-        historyButton.style.backgroundColor = '#007BFF';
-        historyButton.style.color = '#fff';
+        historyButton.style.fontSize = '24px'; // 调整图标大小
+        historyButton.style.backgroundColor = 'transparent';
         historyButton.style.border = 'none';
-        historyButton.style.borderRadius = '5px';
         historyButton.style.cursor = 'pointer';
 
         document.body.appendChild(historyButton);
 
-        // 点击按钮显示记录
-        historyButton.addEventListener('click', displayPlaybackHistory);
+        // 点击图标显示或关闭记录
+        historyButton.addEventListener('click', togglePlaybackHistory);
         console.log('播放记录按钮已创建');
     }
 
-    // 创建一个弹窗来展示播放记录
+    // 切换显示/隐藏播放记录弹窗
+    function togglePlaybackHistory() {
+        const existingModal = document.querySelector('#historyModal');
+        if (existingModal) {
+            existingModal.remove(); // 如果弹窗已存在，点击按钮时移除它
+        } else {
+            displayPlaybackHistory(); // 否则显示记录
+        }
+    }
+
+    // 创建并展示播放记录弹窗
     function displayPlaybackHistory() {
         loadPlaybackHistory();
-
-        // 如果之前已有弹窗，先移除
-        let existingModal = document.querySelector('#historyModal');
-        if (existingModal) {
-            existingModal.remove();
-        }
 
         // 创建弹窗容器
         const modal = document.createElement('div');
@@ -98,20 +109,19 @@
         modal.style.backgroundColor = '#fff';
         modal.style.border = '1px solid #ccc';
         modal.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
-        modal.style.width = '300px';
+        modal.style.width = '400px';
 
         // 添加关闭按钮
         const closeButton = document.createElement('button');
-        closeButton.textContent = '关闭';
-        closeButton.style.marginBottom = '10px';
-        closeButton.style.backgroundColor = '#007BFF';
-        closeButton.style.color = '#fff';
+        closeButton.innerHTML = '❌'; // 使用常见的关闭图标
+        closeButton.style.backgroundColor = 'transparent';
         closeButton.style.border = 'none';
-        closeButton.style.padding = '5px 10px';
+        closeButton.style.fontSize = '20px';
         closeButton.style.cursor = 'pointer';
+        closeButton.style.float = 'right';
 
         closeButton.addEventListener('click', () => {
-            modal.remove();
+            modal.remove(); // 点击关闭按钮时移除弹窗
         });
 
         modal.appendChild(closeButton);
@@ -122,9 +132,10 @@
             noHistory.textContent = '没有播放记录';
             modal.appendChild(noHistory);
         } else {
-            playbackHistory.forEach(record => {
+            playbackHistory.forEach((record, index) => {
                 const recordItem = document.createElement('p');
-                recordItem.innerHTML = `视频URL: <a href="${record.url}" target="_blank">${record.url}</a><br>播放时间: ${record.time.toFixed(2)} 秒<br>记录时间: ${record.date}`;
+                const decodedUrl = decodeURIComponent(record.url); // 解码URL
+                recordItem.innerHTML = `<strong>#${index + 1}</strong> 视频URL: <a href="${decodedUrl}" target="_blank" style="color: blue; text-decoration: underline;">${decodedUrl}</a><br>播放时间: ${formatTime(record.time)}<br>记录时间: ${record.date}`;
                 modal.appendChild(recordItem);
             });
         }
