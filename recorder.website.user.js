@@ -267,8 +267,16 @@ function monitorVideoByClass() {
 
 // 初始化函数
 function init() {
+    const currentPath = window.location.pathname;
+
+    // 判断是否是在 /@manager 或 /@manager* 路径下
+    if (currentPath.startsWith('/@manager')) {
+        console.log('当前页面为 /@manager 或其子路径，脚本不生效');
+        return; // 不执行脚本
+    }
+
     createHistoryButton(); // 创建播放记录按钮
-    monitorVideoProgress(); // 监控视频播放进度
+    monitorVideoByClass(); // 监控视频播放进度
 }
 
 init();

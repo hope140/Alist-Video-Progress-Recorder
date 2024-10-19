@@ -8,9 +8,7 @@
 // @updateURL    https://raw.githubusercontent.com/hope140/Alist-Video-Progress-Recorder/main/recorder_hope.user.js
 // @downloadURL  https://raw.githubusercontent.com/hope140/Alist-Video-Progress-Recorder/main/recorder_hope.user.js
 // @match        https://alist.510711.xyz/*
-// @match        http://192.168.0.100:5244/*
 // @exclude      https://alist.510711.xyz/@manage*
-// @exclude      http://192.168.0.100:5244/@manage*
 // @grant        none
 // ==/UserScript==
 
