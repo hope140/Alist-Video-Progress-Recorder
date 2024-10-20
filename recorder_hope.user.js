@@ -61,7 +61,7 @@
 		let videoHistory = JSON.parse(localStorage.getItem('videoPlaybackHistory')) || [];
 		const existingRecordIndex = videoHistory.findIndex(record => record.url === videoUrl);
 
-		let isWatched = currentTime >= duration - 30;
+		let isWatched = currentTime >= duration - 120;
 
 		if (existingRecordIndex !== -1) {
 			videoHistory[existingRecordIndex].time = currentTime;
